@@ -5,7 +5,68 @@ import pyttsx3
 from langchain.agents import Tool
 from langchain import hub
 from langchain.agents import AgentExecutor, create_react_agent
+# from langchain_gemini import gemini
 from langchain_google_genai import ChatGoogleGenerativeAI
+import requests
+from pdfminer.high_level import extract_text
+import requests
+from io import BytesIO
+import fitz  # PyMuPDF
+
+def extract_text_from_pdf_url(pdf_url):
+    try:
+        # Download the PDF file
+        response = requests.get(pdf_url)
+        response.raise_for_status()  # Check if the request was successful
+
+        # Open the PDF from the downloaded content
+        pdf_document = fitz.open(stream=BytesIO(response.content), filetype="pdf")
+        text = ""
+
+        # Iterate through each page
+        for page_num in range(len(pdf_document)):
+            page = pdf_document.load_page(page_num)
+            text += page.get_text()
+
+        return text 
+    except Exception as e:
+        print(f"Error: {e}")
+        return None
+
+def pdf(s):
+    try:
+        try:
+            from googlesearch import search
+        except ImportError:
+            print("No module named 'google' found")
+        query = f"filetype:pdf {s}"
+        for j in search(query, tld="co.in", num=1, stop=5, pause=2):
+            if ".pdf" in j:
+                k = j.split("/")
+                for i in k:
+                    if ".pdf" in i:
+                        return(j)
+                
+                
+    except Exception as e:
+        print(f"Error: {e}")
+        print("PDF NOT Found")
+
+def phnumber(my_string):
+    print(my_string)
+    phonenum = ("91" + my_string.replace(" ", ""))
+    url = ("http://apilayer.net/api/validate?access_key=cd3af5f7d1897dc1707c47d05c3759fd&number=" + phonenum)
+    resp = requests.get(url)
+    details = resp.json()
+  
+    speak_text("collecting data")
+    print('')
+    print("Country : " + details['country_name'])
+    speak_text("Country : " + details['country_name'])
+    print("Location : " + details['location'])
+    speak_text("Location : " + details['location'])
+    print("Carrier : " + details['carrier'])
+    speak_text("Carrier : " + details['carrier'])
 
 def get_voice_input(prompt="Please say something:"):
     recognizer = sr.Recognizer()
@@ -115,10 +176,29 @@ schedule_meet = Tool(
     description="Useful for scheduling a meeting in Teams give the title,participants,discription,start_date,start_time,end_time as a list with comma seprated values."
 )
 
+ 
+phone_info = Tool(
+    name="information of the phone number",
+    func=phnumber,
+    description="Useful for fetch a information about a phone number need to parse a phonenumber as argument to the function."
+)
+
+pdf_link = Tool(
+    name="getting pdf from internet",
+    func=pdf,
+    description="Useful for fetch a pdf link from internet need to parse the pdf name in the argumnet and it will return a link you need to sumarize it."
+)
+pdfextract_text_from_pdf_url_tool = Tool(
+    name="extract the text from the link",
+    func=extract_text_from_pdf_url,
+    description="usefull to extract the text from the pdf. need to provide the link to the funtion and it will return the text."
+)
+
+
 prompt_react = hub.pull("hwchase17/react")
 print(prompt_react.template)
 
-tools = [schedule_meet]
+tools = [schedule_meet,phone_info,pdf_link,pdfextract_text_from_pdf_url_tool]
 retrieved_text = ""
 
 # Load ReAct prompt
@@ -126,10 +206,10 @@ prompt_react = hub.pull("hwchase17/react")
 
 # Initialize Gemini model for language understanding
 model = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
+    model="gemini-2.5-flash",  # or "gemini-pro"
     google_api_key="AIzaSyCVoobkB6z5MbfvD_0zOgPV756Gix525K0",  # Replace with your Gemini API key
     temperature=0.3,
-    max_tokens=4096,  # Increase this value if needed
+    max_tokens=4096,
 )
 
 # Create ReAct agent
@@ -139,6 +219,6 @@ react_agent_executor = AgentExecutor(
 )
 
 # Get voice input and schedule the meeting
-input_string = get_voice_input("Please say the meeting details:")
+input_string = input("Please say the meeting details:")
 if input_string:
     react_agent_executor.invoke({"input": input_string})

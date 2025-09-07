@@ -5,6 +5,7 @@ from langchain.docstore.document import Document
 from langchain_community.vectorstores import FAISS
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.embeddings import HuggingFaceEmbeddings
+from langchain_google_genai import ChatGoogleGenerativeAI  # Gemini import
 
 def extract_text_from_pdf_url(pdf_url):
     try:
@@ -50,17 +51,28 @@ vector_store.save_local("example_index")
 # Load the vector store
 vector_store = FAISS.load_local("example_index", embedding_model, allow_dangerous_deserialization=True)
 
-def answer_question(question, vector_store, embedding_model):
-    # Perform similarity search using the vector store
+# Initialize Gemini model
+gemini = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash",  # or "gemini-pro"
+    google_api_key="YOUR_GEMINI_API_KEY",  # Replace with your Gemini API key
+    temperature=0.3,
+    max_tokens=1024,
+)
+
+def answer_question_with_gemini(question, vector_store, embedding_model, gemini):
+    # Retrieve relevant chunks
     results = vector_store.similarity_search(question, k=3)
-    return results
+    context = "\n\n".join([doc.page_content for doc in results])
+    prompt = f"Context:\n{context}\n\nQuestion: {question}\nAnswer:"
+    # Use Gemini to generate the answer
+    response = gemini.invoke(prompt)
+    return response
 
 question = "What is the main topic of the document?"
-answers = answer_question(question, vector_store, embedding_model)
+answer = answer_question_with_gemini(question, vector_store, embedding_model, gemini)
 
-print("Top 3 most relevant chunks for the question:")
-for i, answer in enumerate(answers):
-    print(f"Chunk {i+1}: {answer.page_content}")
+print("Gemini's answer:")
+print(answer)
 
 
 
